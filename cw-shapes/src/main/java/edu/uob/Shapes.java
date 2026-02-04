@@ -4,7 +4,7 @@ public class Shapes {
 
   // TODO use this class as then entry point; play around with your shapes, etc
   public static void main(String[] args) {
-    System.out.println("Hello world!");
+    /*System.out.println("Hello world!");
       Triangle testTriangle = new Triangle(5, 5, 5);
       System.out.println(testTriangle.calculateArea());
       System.out.println(testTriangle.calculatePerimeterLength());
@@ -22,7 +22,7 @@ public class Shapes {
       shape = new Triangle(4, 5, 7);
       System.out.println(shape.toString());
       shape = new Rectangle(4,6);
-      System.out.println(shape.toString());
+      System.out.println(shape.toString());*/
 
       TwoDimensionalShape[] shapes = new TwoDimensionalShape[100];
       for(int i = 0; i < shapes.length; i++){
@@ -39,5 +39,14 @@ public class Shapes {
           if(shapes[i] instanceof Triangle) count++;
       }
       System.out.println(count + " triangles have been created");
+      System.out.println("Triangle count using class variable: " + Triangle.getPopulation());
+      for (TwoDimensionalShape s : shapes) {
+
+          if (s instanceof Triangle) {
+              Triangle t = (Triangle) s;
+              System.out.println(t.getVariant());
+          }
+      }
+
   }
 }

@@ -5,12 +5,14 @@ public class Triangle extends TwoDimensionalShape implements MultiVariantShape {
   int a, b, c;
 
   private  TriangleVariant variant;
+  private static int population = 0;
 
   public Triangle(int a, int b, int c) {
       this.a = a;
       this.b = b;
       this.c = c;
       this.variant = determineVariant();
+      population = population + 1;
   }
   private TriangleVariant determineVariant() {
       if(a <=0 || b<=0 || c<=0) {
@@ -63,5 +65,9 @@ public class Triangle extends TwoDimensionalShape implements MultiVariantShape {
 
   public int calculatePerimeterLength() {
     return a + b + c;
+  }
+
+  public static int getPopulation() {
+    return population;
   }
 }
