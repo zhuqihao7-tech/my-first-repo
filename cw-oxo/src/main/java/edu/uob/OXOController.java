@@ -20,10 +20,22 @@ public class OXOController implements Serializable {
         }
         char rowchar = command.charAt(0);
         char columnchar = command.charAt(1);
+        if(!Character.isAlphabetic(rowchar)) {
+            throw new OXOMoveException.InvalidIdentifierCharacterException(OXOMoveException.RowOrColumn.ROW, rowchar);
+        }
+        if(!Character.isDigit(columnchar)) {
+            throw new OXOMoveException.InvalidIdentifierCharacterException(OXOMoveException.RowOrColumn.COLUMN, columnchar);
+        }
         int row = Character.toLowerCase(rowchar) - 'a';
         int column = Character.getNumericValue(columnchar) - 1;
+        if(row < 0 || row >= gameModel.getNumberOfRows()){
+            throw new OXOMoveException.OutsideCellRangeException(OXOMoveException.RowOrColumn.ROW, row+1);
+        }
+        if(column < 0 || column >= gameModel.getNumberOfColumns()){
+            throw new OXOMoveException.OutsideCellRangeException(OXOMoveException.RowOrColumn.COLUMN, column+1);
+        }
         if (gameModel.getCellOwner(row, column) != null) {
-            return;
+            throw new OXOMoveException.CellAlreadyTakenException(row, column);
         }
         int currentPlayerNumber = gameModel.getCurrentPlayerNumber();
         OXOPlayer currentPlayer = gameModel.getPlayerByNumber(currentPlayerNumber);
@@ -57,8 +69,28 @@ public class OXOController implements Serializable {
         if(gameModel.getWinner() != null) return;
         gameModel.removeColumn();
     }
-    public void increaseWinThreshold() {}
-    public void decreaseWinThreshold() {}
+    public void increaseWinThreshold() {
+        int min1 = gameModel.getNumberOfRows();
+        int min2 = gameModel.getNumberOfColumns();
+        int min;
+        if(min1 > min2) {
+            min = min2;
+        }else{
+            min = min1;
+        }
+        if(gameModel.getWinThreshold() < min){
+            if(gameModel.getWinner() == null) {
+                gameModel.setWinThreshold(gameModel.getWinThreshold() + 1);
+            }
+        }
+    }
+    public void decreaseWinThreshold() {
+        if(gameModel.getWinThreshold() > 3){
+            if(!hasGameStarted()) {
+                gameModel.setWinThreshold(gameModel.getWinThreshold() - 1);
+            }
+        }
+    }
     public void reset() {
         for(int i = 0; i < gameModel.getNumberOfRows(); i++) {
             for(int j = 0; j < gameModel.getNumberOfColumns(); j++) {
@@ -110,6 +142,18 @@ public class OXOController implements Serializable {
         }
 
         gameModel.setGameDrawn(true);
+    }
+
+    public boolean hasGameStarted() {
+        boolean GameStarted = false;
+        for (int r = 0; r < gameModel.getNumberOfRows(); r++) {
+            for (int c = 0; c < gameModel.getNumberOfColumns(); c++) {
+                if (gameModel.getCellOwner(r, c) != null) {
+                    GameStarted = true;
+                }
+            }
+        }
+        return GameStarted;
     }
 
 }
