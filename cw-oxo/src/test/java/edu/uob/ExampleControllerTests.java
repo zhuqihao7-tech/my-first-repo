@@ -59,4 +59,24 @@ class ExampleControllerTests {
     assertThrows(InvalidIdentifierLengthException.class, ()-> controller.handleIncomingCommand("abc123"), failedTestComment);
     assertThrows(InvalidIdentifierLengthException.class, ()-> controller.handleIncomingCommand("aa1"));
   }
+
+  @Test
+  void testFourPlayers() throws OXOMoveException {
+
+    OXOModel model = new OXOModel(3,3,3);
+
+    model.addPlayer(new OXOPlayer('X'));
+    model.addPlayer(new OXOPlayer('O'));
+    model.addPlayer(new OXOPlayer('A'));
+    model.addPlayer(new OXOPlayer('B'));
+
+    OXOController controller = new OXOController(model);
+
+    controller.handleIncomingCommand("A1"); // X
+    controller.handleIncomingCommand("A2"); // O
+    controller.handleIncomingCommand("A3"); // A
+    controller.handleIncomingCommand("B1"); // B
+
+    assertEquals(0, model.getCurrentPlayerNumber());
+  }
 }
