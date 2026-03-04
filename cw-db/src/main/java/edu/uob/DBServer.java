@@ -11,6 +11,7 @@ public class DBServer {
 
     private static final char END_OF_TRANSMISSION = 4;
     private String storageFolderPath;
+    private Database database;
 
     public static void main(String args[]) throws IOException {
         DBServer server = new DBServer();
@@ -28,6 +29,14 @@ public class DBServer {
         } catch(IOException ioe) {
             System.out.println("Can't seem to create database storage folder " + storageFolderPath);
         }
+
+        database = new Database();
+
+        try {
+            database.loadTable(storageFolderPath, "testdb", "people");
+        } catch (IOException e) {
+            System.out.println("Could not load table");
+        }
     }
 
     /**
@@ -38,11 +47,24 @@ public class DBServer {
     */
     public String handleCommand(String command) {
         // TODO implement your server logic here
-        try {
-            return readTableFile("testdb", "people");
-        }catch(IOException e) {
-            return "ERROR";
+        Table table = database.getTable("people");
+
+        StringBuilder result = new StringBuilder();
+
+        for (String col : table.getColumns()) {
+            result.append(col).append("\t");
         }
+        result.append("\n");
+
+        for (Row row : table.getRows()) {
+            for (String col : table.getColumns()) {
+                result.append(row.get(col)).append("\t");
+            }
+            result.append("\n");
+        }
+
+        return result.toString();
+
         //return "";
     }
 
@@ -100,6 +122,42 @@ public class DBServer {
         }
         reader.close();
         return result.toString();
+    }
+
+    private int generateNextId(String databaseName, String tableName) throws IOException {
+
+        String dbName = databaseName.toLowerCase();
+        String table = tableName.toLowerCase();
+
+        String filePath = storageFolderPath
+                + File.separator
+                + dbName
+                + File.separator
+                + table + ".tab";
+
+        File file = new File(filePath);
+
+        if (!file.exists()) {
+            throw new IOException("Table file does not exist");
+        }
+
+        BufferedReader reader = new BufferedReader(new FileReader(file));
+        String line;
+
+        int maxId = 0;reader.readLine();
+
+        while ((line = reader.readLine()) != null) {
+            String[] columns = line.split("\t");
+            int id = Integer.parseInt(columns[0]);
+
+            if (id > maxId) {
+                maxId = id;
+            }
+        }
+
+        reader.close();
+
+        return maxId + 1;
     }
 
 }
