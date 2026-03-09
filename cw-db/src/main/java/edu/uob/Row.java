@@ -17,7 +17,7 @@ public class Row {
     public Map<String,String> getAllData(){
         return data;
     }
-    public void remove(String columnName){
-        data.remove(columnName);
+    public void remove(String column){
+        data.remove(column);
     }
 }
