@@ -16,6 +16,9 @@ public class Database {
     public Table getTable(String name){
         return tables.get(name.toLowerCase());
     }
+    public Collection<Table> getTableNumbers(){
+        return tables.values();
+    }
     public boolean hasTable(String name){
         return tables.containsKey(name.toLowerCase());
     }
