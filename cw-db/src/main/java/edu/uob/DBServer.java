@@ -170,7 +170,25 @@ public class DBServer {
             return "[ERROR]: Invalid command format";
         }
         String dbName = tokens[1];
+        File dbDir = new File(storageFolderPath + File.separator + dbName);
+        if(!dbDir.exists()) {
+            return "[ERROR]: Database does not exist";
+        }
         currentDatabase = dbName;
+        database = new Database();
+        File[] files = dbDir.listFiles();
+        if(files != null) {
+            for(File file : files) {
+                if(file.getName().endsWith(".tab")) {
+                    String tableName = file.getName().replace(".tab", "");
+                    try {
+                        database.loadTable(storageFolderPath,dbName,tableName);
+                    }catch(IOException e) {
+                        return "[ERROR]: Could not load table " + tableName;
+                    }
+                }
+            }
+        }
         return "[OK]";
 
     }
@@ -190,7 +208,7 @@ public class DBServer {
         if(tokens[1].equalsIgnoreCase("TABLE")){
             String tableName = tokens[2];
             if (currentDatabase == null) {
-                return "ERROR: No database selected";
+                return "[ERROR]: No database selected";
             }
             File tableFile = new File(storageFolderPath + File.separator + currentDatabase
                     + File.separator + tableName.toLowerCase()+ ".tab");
@@ -199,18 +217,23 @@ public class DBServer {
             }
             try{
                 FileWriter writer = new FileWriter(tableFile);
+                Table table = new Table(tableName.toLowerCase());
                 writer.write("id");
+                table.addColumn("id");
                 int start = command.indexOf("(");
                 int end = command.indexOf(")");
                 if(start != -1 && end != -1){
                     String columnsPart = command.substring(start + 1, end);
                     String[] columns = columnsPart.split(",");
                     for(String col : columns){
-                        writer.write("\t" + col.trim().toLowerCase());
+                        String columnName = col.trim().toLowerCase();
+                        writer.write("\t" + columnName);
+                        table.addColumn(columnName);
                     }
                 }
                 writer.write("\n");
                 writer.close();
+                database.addTable(table);
             } catch(IOException e){
                 return "[ERROR]: Could not create table";
             }
@@ -281,8 +304,8 @@ public class DBServer {
         result.append("\n");
         for (Row row : table.getRows()) {
 
-            if (condition == null && evaluateCondition(row, condition)) {
-                return "[ERROR]";
+            if (condition != null && !evaluateCondition(row, condition)) {
+                continue;
             }
             for (String col : selectedColumns) {
                 result.append(row.get(col)).append("\t");
@@ -378,69 +401,58 @@ public class DBServer {
         String tableName = beforeSet.split("\\s+")[1];
         String[] setWhere = afterSet.split("WHERE");
         String  setPart = setWhere[0].trim();
-        String  wherePart = setWhere[1].trim();
+        String condition = setWhere[1].trim();
         String[] setTokens = setPart.split("=");
         String setColumn = setTokens[0].trim();
         String setValue = setTokens[1].trim().replace("'","");
-        String[] whereTokens = wherePart.split("==");
-        String whereColumn = whereTokens[0].trim();
-        String whereValue = whereTokens[1].trim().replace("'","");
         Table table = database.getTable(tableName);
         if(table == null){
-            return "ERROR: No such table: " + tableName;
+            return "[ERROR]: No such table: " + tableName;
         }
         boolean updated = false;
         for(Row row : table.getRows()){
-            String value = row.get(whereColumn);
-            if(value != null && value.equals(whereValue)){
+            if (evaluateCondition(row, condition)) {
                 row.set(setColumn, setValue);
                 updated = true;
             }
         }
         if(updated){
             saveDatabase();
-            return "OK";
+            return "[OK]";
         }
-        return "ERROR";
+        return "[ERROR]";
     }
     private String handleDelete (String command) {
         command = command.replace(";","");
         String[] parts = command.split("WHERE");
         if(parts.length != 2){
-            return "ERROR: Invalid command format";
+            return "[ERROR]: Invalid command format";
         }
         String beforeWhere = parts[0].trim();
         String[] tokens = beforeWhere.split("\\s+");
         if(tokens.length < 3){
-            return "ERROR: Invalid command format";
+            return "[ERROR]: Invalid command format";
         }
         String tableName = tokens[2];
-        String afterWhere = parts[1].trim();
-        String[] whereTokens = afterWhere.split("==");
-        if(whereTokens.length != 2){
-            return "ERROR: Invalid command format";
-        }
-        String whereColumn = whereTokens[0].trim();
-        String whereValue = whereTokens[1].trim().replace("'","");
+        String condition = parts[1].trim();
         Table table = database.getTable(tableName);
         if(table == null){
-            return "ERROR: No such table: " + tableName;
+            return "[ERROR]: No such table: " + tableName;
         }
         boolean deleted = false;
         Iterator<Row> iterator = table.getRows().iterator();
         while(iterator.hasNext()){
             Row row = iterator.next();
-            String value = row.get(whereColumn);
-            if(value != null && value.equals(whereValue)){
+            if (evaluateCondition(row, condition)) {
                 iterator.remove();
                 deleted = true;
             }
         }
         if(deleted){
             saveDatabase();
-            return "OK";
+            return "[OK]";
         }else {
-            return "ERROR: No matching rows found";
+            return "[ERROR]: No matching rows found";
         }
     }
     private String handleAlter(String command){
@@ -454,71 +466,71 @@ public class DBServer {
         String columnName = tokens[4];
         Table table = database.getTable(tableName);
         if(table == null){
-            return "ERROR: No such table: " + tableName;
+            return "[ERROR]: No such table: " + tableName;
         }
         if(operation.equals("DROP")){
             if(!table.getColumns().contains(columnName)){
-                return "ERROR: Invalid column name: " + columnName;
+                return "[ERROR]: Invalid column name: " + columnName;
             }
             table.getColumns().remove(columnName);
             for(Row row : table.getRows()){
                 row.remove(columnName);
             }
         }else if(operation.equals("ADD")){
-            if(!table.getColumns().contains(columnName)){
-                return "ERROR: Invalid column name: " + columnName;
+            if(table.getColumns().contains(columnName)){
+                return "[ERROR]: Invalid column name: " + columnName;
             }
             table.getColumns().add(columnName);
             for(Row row : table.getRows()){
                 row.set(columnName, "");
             }
         }else{
-            return "ERROR: Invalid operation: " + operation;
+            return "[ERROR]: Invalid operation: " + operation;
         }
         saveDatabase();
-        return "OK";
+        return "[OK]";
     }
 
     private String handleDrop(String command){
         command = command.replace(";","").trim();
         String[] tokens = command.split("\\s+");
         if(tokens.length < 3){
-            return "ERROR: Invalid command format";
+            return "[ERROR]: Invalid command format";
         }
         String type = tokens[1].toUpperCase();
         String name = tokens[2];
         if(type.equals("TABLE")) {
             String tableFilePath = storageFolderPath + File.separator + currentDatabase
-                    + File.separator + name.toLowerCase();
+                    + File.separator + name.toLowerCase() + ".tab";
             File tableFile = new File(tableFilePath);
             if (!tableFile.exists()) {
-                return "ERROR: Table not found: " + name;
+                return "[ERROR]: Table not found: " + name;
             }
             if (tableFile.delete()) {
-                return "OK";
+                return "[OK]";
             } else {
-                return "ERROR: Unable to delete table: " + name;
+                return "[ERROR]: Unable to delete table: " + name;
             }
         }else if(type.equals("DATABASE")) {
             String dbPath = storageFolderPath + File.separator + name.toLowerCase();
             File dbDir =  new File(dbPath);
             if(!dbDir.exists()){
-                return "ERROR: Database directory not found: " + name;
+                return "[ERROR]: Database directory not found: " + name;
             }
             try {
                 deleteDirectory(dbDir);
                 if (name.equalsIgnoreCase(currentDatabase)) {
                     currentDatabase = null;
-                    return "OK";
+                    return "[OK]";
                 }
             }catch(Exception e){
-                return "ERROR: Unable to delete database: " + name;
+                return "[ERROR]: Unable to delete database: " + name;
             }
 
         }else{
-            return "ERROR: Invalid operation: " + type;
+            return "[ERROR]: Invalid operation: " + type;
         }
-        return "ERROR: Invalid command format";
+        return "[ERROR]: Invalid command format";
     }
 
     private void deleteDirectory(File dir)throws IOException{
@@ -542,7 +554,7 @@ public class DBServer {
         Table table1 = database.getTable(table1Name);
         Table table2 = database.getTable(table2Name);
         if(table1 == null || table2 == null){
-            return "ERROR: Invalid command format";
+            return "[ERROR]: Invalid command format";
         }
         StringBuilder result = new StringBuilder();
         for(String col : table1.getColumns()){
@@ -568,6 +580,6 @@ public class DBServer {
             }
         }
 
-        return "OK \n + result.toString()";
+        return "[OK] \n + result.toString()";
     }
 }
