@@ -35,11 +35,11 @@ public class DBServer {
 
         database = new Database();
 
-        try {
+       /* try {
             database.loadTable(storageFolderPath, "testdb", "people");
         } catch (IOException e) {
             System.out.println("Could not load table");
-        }
+        }*/
     }
 
     /**

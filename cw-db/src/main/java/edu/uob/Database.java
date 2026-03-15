@@ -84,4 +84,4 @@ public class Database {
         table.setNextId(maxId + 1);
         addTable(table);
     }
-    }
+}
