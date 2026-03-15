@@ -18,6 +18,6 @@ public class Row {
         return data;
     }
     public void remove(String column){
-        data.remove(column);
+        data.remove(column.toLowerCase());
     }
 }
