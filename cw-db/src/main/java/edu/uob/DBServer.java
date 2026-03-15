@@ -132,7 +132,7 @@ public class DBServer {
 
             File dbDir = new File("databases/" + currentDatabase);
 
-            for(Table table : database.getTableNumbers()){
+            for(Table table : database.getTableValues()){
 
                 File tableFile = new File(dbDir, table.getName() + ".tab");
 
