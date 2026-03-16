@@ -35,11 +35,6 @@ public class DBServer {
 
         database = new Database();
 
-       /* try {
-            database.loadTable(storageFolderPath, "testdb", "people");
-        } catch (IOException e) {
-            System.out.println("Could not load table");
-        }*/
     }
 
     /**
@@ -87,7 +82,6 @@ public class DBServer {
             return "[ERROR]: " + e.getMessage();
         }
 
-        //return "";
     }
 
     //  === Methods below handle networking aspects of the project - you will not need to change these ! ===
@@ -130,33 +124,23 @@ public class DBServer {
 
         try {
 
-            File dbDir = new File("databases/" + currentDatabase);
+            File dbDir = new File(storageFolderPath + File.separator + currentDatabase);
 
             for(Table table : database.getTableValues()){
-
                 File tableFile = new File(dbDir, table.getName() + ".tab");
-
                 BufferedWriter writer = new BufferedWriter(new FileWriter(tableFile));
-
-                // 写列名
                 for(String col : table.getColumns()){
                     writer.write(col + "\t");
                 }
                 writer.newLine();
-
-                // 写数据
                 for(Row row : table.getRows()){
-
                     for(String col : table.getColumns()){
                         writer.write(row.get(col) + "\t");
                     }
-
                     writer.newLine();
                 }
-
                 writer.close();
             }
-
         } catch(IOException e){
             e.printStackTrace();
         }
@@ -190,7 +174,6 @@ public class DBServer {
             }
         }
         return "[OK]";
-
     }
 
     private String handleCreate(String command) {
@@ -283,28 +266,27 @@ public class DBServer {
             return "[ERROR]: No such table: " + tableName;
         }
         List<String> selectedColumns = new ArrayList<>();
-        if (selectPart.equals("*")) {
+        if(selectPart.equals("*")){
             selectedColumns = table.getColumns();
-        } else {
+        }else{
             String[] cols = selectPart.split(",");
-            for (String c : cols) {
+            for(String c : cols){
                 selectedColumns.add(c.trim());
             }
         }
         boolean hasWhere = command.toUpperCase().contains("WHERE");
         String condition = null;
 
-        if (hasWhere) {
+        if(hasWhere){
             condition = command.substring(command.toUpperCase().indexOf("WHERE") + 5).trim();
         }
         StringBuilder result = new StringBuilder();
-        for (String col : selectedColumns) {
+        for(String col : selectedColumns){
             result.append(col).append("\t");
         }
         result.append("\n");
-        for (Row row : table.getRows()) {
-
-            if (condition != null && !evaluateCondition(row, condition)) {
+        for(Row row : table.getRows()){
+            if(condition != null && !evaluateCondition(row, condition)){
                 continue;
             }
             for (String col : selectedColumns) {
@@ -312,82 +294,48 @@ public class DBServer {
             }
             result.append("\n");
         }
-        return "[OK]\n" + result.toString();
-        /*String tableName = tokens[3];
-        Table table = database.getTable(tableName);
-        if(table == null){
-            return "ERROR: No such table: " + tableName;
-        }
-        StringBuilder result = new StringBuilder();
-        for(String col : table.getColumns()){
-            result.append(col).append("\t");
-        }
-        result.append("\n");
-        for(Row row : table.getRows()){
-            for(String col : table.getColumns()){
-                result.append(row.get(col)).append("\t");
-            }
-            result.append("\n");
-        }
-        return result.toString();*/
+        return "[OK]\n" + result;
     }
 
     private boolean evaluateCondition(Row row, String condition) {
         condition = condition.replace("(", "").replace(")", "");
-        if (condition.contains("AND")) {
-
-            String[] parts = condition.split("AND");
-
-            for (String part : parts) {
-                if (!evaluateCondition(row, part.trim())) {
+        if(condition.toUpperCase().contains("AND")){
+            String[] parts = condition.split("(?i)AND");
+            for(String part : parts){
+                if(!evaluateCondition(row, part.trim())){
                     return false;
                 }
             }
             return true;
         }
-        if (condition.contains("LIKE")) {
-
-            String[] parts = condition.split("LIKE");
-
+        if(condition.toUpperCase().contains("LIKE")){
+            String[] parts = condition.split("(?i)LIKE");
             String column = parts[0].trim();
             String value = parts[1].replace("'", "").trim();
-
             return row.get(column).contains(value);
         }
-        if (condition.contains("==")) {
-
+        if(condition.contains("==")){
             String[] parts = condition.split("==");
-
             String column = parts[0].trim();
             String value = parts[1].replace("'", "").trim();
-
             return row.get(column).equalsIgnoreCase(value);
         }
-        if (condition.contains("!=")) {
-
+        if(condition.contains("!=")){
             String[] parts = condition.split("!=");
-
             String column = parts[0].trim();
             String value = parts[1].replace("'", "").trim();
-
             return !row.get(column).equalsIgnoreCase(value);
         }
-        if (condition.contains(">")) {
-
+        if(condition.contains(">")){
             String[] parts = condition.split(">");
-
             String column = parts[0].trim();
             int value = Integer.parseInt(parts[1].trim());
-
             return Integer.parseInt(row.get(column)) > value;
         }
-        if (condition.contains("<")) {
-
+        if(condition.contains("<")){
             String[] parts = condition.split("<");
-
             String column = parts[0].trim();
             int value = Integer.parseInt(parts[1].trim());
-
             return Integer.parseInt(row.get(column)) < value;
         }
         return false;
@@ -395,12 +343,12 @@ public class DBServer {
 
     private  String handleUpdate(String command) {
         command = command.replace(";","");
-        String[] parts = command.split("SET");
+        String[] parts = command.split("(?i)SET");
         String beforeSet = parts[0].trim();
         String afterSet = parts[1].trim();
         String tableName = beforeSet.split("\\s+")[1];
-        String[] setWhere = afterSet.split("WHERE");
-        String  setPart = setWhere[0].trim();
+        String[] setWhere = afterSet.split("(?i)WHERE");
+        String setPart = setWhere[0].trim();
         String condition = setWhere[1].trim();
         String[] setTokens = setPart.split("=");
         String setColumn = setTokens[0].trim();
@@ -422,6 +370,7 @@ public class DBServer {
         }
         return "[ERROR]";
     }
+
     private String handleDelete (String command) {
         command = command.replace(";","");
         String[] parts = command.split("WHERE");
@@ -455,6 +404,7 @@ public class DBServer {
             return "[ERROR]: No matching rows found";
         }
     }
+
     private String handleAlter(String command){
         command = command.replace(";","");
         String[] tokens = command.split("\\s+");
@@ -503,21 +453,21 @@ public class DBServer {
             String tableFilePath = storageFolderPath + File.separator + currentDatabase
                     + File.separator + name.toLowerCase() + ".tab";
             File tableFile = new File(tableFilePath);
-            if (!tableFile.exists()) {
+            if(!tableFile.exists()){
                 return "[ERROR]: Table not found: " + name;
             }
-            if (tableFile.delete()) {
+            if(tableFile.delete()){
                 return "[OK]";
-            } else {
+            }else{
                 return "[ERROR]: Unable to delete table: " + name;
             }
-        }else if(type.equals("DATABASE")) {
+        }else if(type.equals("DATABASE")){
             String dbPath = storageFolderPath + File.separator + name.toLowerCase();
             File dbDir =  new File(dbPath);
             if(!dbDir.exists()){
                 return "[ERROR]: Database directory not found: " + name;
             }
-            try {
+            try{
                 deleteDirectory(dbDir);
                 if (name.equalsIgnoreCase(currentDatabase)) {
                     currentDatabase = null;
@@ -526,7 +476,6 @@ public class DBServer {
             }catch(Exception e){
                 return "[ERROR]: Unable to delete database: " + name;
             }
-
         }else{
             return "[ERROR]: Invalid operation: " + type;
         }
@@ -579,7 +528,6 @@ public class DBServer {
                 }
             }
         }
-
-        return "[OK] \n + result.toString()";
+        return "[OK]\n" + result;
     }
 }
