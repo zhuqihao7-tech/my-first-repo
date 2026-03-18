@@ -120,6 +120,16 @@ public class DBServer {
 
     private String currentDatabase;
 
+    private final List<String> reservedKeywords = List.of(
+            "USE","CREATE","DATABASE","TABLE","INSERT","INTO","VALUES",
+            "SELECT","FROM","WHERE","UPDATE","SET","DELETE",
+            "ALTER","ADD","DROP","JOIN","AND","OR","LIKE","TRUE","FALSE"
+    );
+
+    private boolean isReservedKeyword(String name) {
+        return reservedKeywords.contains(name.toUpperCase());
+    }
+
     private void saveDatabase() {
 
         try {
@@ -181,6 +191,9 @@ public class DBServer {
         String[] tokens = command.split("\\s+");
         if(tokens[1].equalsIgnoreCase("DATABASE")){
             String dbName = tokens[2];
+            if(isReservedKeyword(dbName)){
+                return "[ERROR]: Database name is reserved";
+            }
             File dbFolder = new File(storageFolderPath +File.separator + dbName);
             if(dbFolder.exists()){
                 return "[ERROR]: Database already exists";
@@ -190,6 +203,9 @@ public class DBServer {
         }
         if(tokens[1].equalsIgnoreCase("TABLE")){
             String tableName = tokens[2];
+            if(isReservedKeyword(tableName)){
+                return "[ERROR]: Table name is reserved";
+            }
             if (currentDatabase == null) {
                 return "[ERROR]: No database selected";
             }
@@ -210,6 +226,9 @@ public class DBServer {
                     String[] columns = columnsPart.split(",");
                     for(String col : columns){
                         String columnName = col.trim().toLowerCase();
+                        if(isReservedKeyword(columnName)){
+                            return "[ERROR]: Column name is reserved";
+                        }
                         writer.write("\t" + columnName);
                         table.addColumn(columnName);
                     }
@@ -227,7 +246,7 @@ public class DBServer {
 
     private String handleInsert(String command) {
         command = command.replace(";","");
-        String[] parts = command.split("VALUES");
+        String[] parts = command.split("(?i)VALUES");
         String[] tokens = parts[0].trim().split("\\s+");
         String tableName = tokens[2];
         String valuesPart = parts[1].trim();
@@ -271,7 +290,11 @@ public class DBServer {
         }else{
             String[] cols = selectPart.split(",");
             for(String c : cols){
-                selectedColumns.add(c.trim());
+                String colName = c.trim().toLowerCase();
+                if(!table.getColumns().contains(colName)){
+                    return "[ERROR]: Invalid column name: " + colName;
+                }
+                selectedColumns.add(colName);
             }
         }
         boolean hasWhere = command.toUpperCase().contains("WHERE");
@@ -299,6 +322,15 @@ public class DBServer {
 
     private boolean evaluateCondition(Row row, String condition) {
         condition = condition.replace("(", "").replace(")", "");
+        if(condition.toUpperCase().contains("OR")){
+            String[] parts = condition.split("(?i)OR");
+            for(String part : parts){
+                if(evaluateCondition(row, part.trim())){
+                    return true;
+                }
+            }
+            return false;
+        }
         if(condition.toUpperCase().contains("AND")){
             String[] parts = condition.split("(?i)AND");
             for(String part : parts){
@@ -326,19 +358,41 @@ public class DBServer {
             String value = parts[1].replace("'", "").trim();
             return !row.get(column).equalsIgnoreCase(value);
         }
+        if(condition.contains(">=")){
+            String[] parts = condition.split(">=");
+            String column = parts[0].trim();
+            String value = parts[1].replace("'", "").trim();
+            return compareValues(row.get(column), value) >= 0;
+        }
         if(condition.contains(">")){
             String[] parts = condition.split(">");
             String column = parts[0].trim();
-            int value = Integer.parseInt(parts[1].trim());
-            return Integer.parseInt(row.get(column)) > value;
+            String value = parts[1].replace("'", "").trim();
+            return compareValues(row.get(column), value) > 0;
+        }
+        if(condition.contains("<=")){
+            String[] parts = condition.split("<=");
+            String column = parts[0].trim();
+            String value = parts[1].replace("'", "").trim();
+            return compareValues(row.get(column), value) <= 0;
         }
         if(condition.contains("<")){
             String[] parts = condition.split("<");
             String column = parts[0].trim();
-            int value = Integer.parseInt(parts[1].trim());
-            return Integer.parseInt(row.get(column)) < value;
+            String value = parts[1].replace("'", "").trim();
+            return compareValues(row.get(column), value) < 0;
         }
         return false;
+    }
+
+    private int compareValues(String left, String right) {
+        try {
+            double l = Double.parseDouble(left);
+            double r = Double.parseDouble(right);
+            return Double.compare(l, r);
+        }catch (Exception e){
+            return left.compareTo(right);
+        }
     }
 
     private  String handleUpdate(String command) {
@@ -352,10 +406,16 @@ public class DBServer {
         String condition = setWhere[1].trim();
         String[] setTokens = setPart.split("=");
         String setColumn = setTokens[0].trim();
+        if(setColumn.equalsIgnoreCase("id")){
+            return "[ERROR]: Cannot modify id column";
+        }
         String setValue = setTokens[1].trim().replace("'","");
         Table table = database.getTable(tableName);
         if(table == null){
             return "[ERROR]: No such table: " + tableName;
+        }
+        if(!table.getColumns().contains(setColumn)){
+            return "[ERROR]: Column does not exist: " + setColumn;
         }
         boolean updated = false;
         for(Row row : table.getRows()){
@@ -366,14 +426,13 @@ public class DBServer {
         }
         if(updated){
             saveDatabase();
-            return "[OK]";
         }
-        return "[ERROR]";
+        return "[OK]";
     }
 
     private String handleDelete (String command) {
         command = command.replace(";","");
-        String[] parts = command.split("WHERE");
+        String[] parts = command.split("(?i)WHERE");
         if(parts.length != 2){
             return "[ERROR]: Invalid command format";
         }
@@ -399,21 +458,25 @@ public class DBServer {
         }
         if(deleted){
             saveDatabase();
-            return "[OK]";
-        }else {
-            return "[ERROR]: No matching rows found";
         }
+        return "[OK]";
     }
 
     private String handleAlter(String command){
         command = command.replace(";","");
         String[] tokens = command.split("\\s+");
         if(tokens.length != 5){
-            return "ERROR: Invalid command format";
+            return "[ERROR]: Invalid command format";
         }
         String tableName = tokens[2];
         String operation = tokens[3].toUpperCase();
-        String columnName = tokens[4];
+        String columnName = tokens[4].toLowerCase();
+        if (isReservedKeyword(columnName)){
+            return "[ERROR]: Reserved column name";
+        }
+        if(columnName.equalsIgnoreCase("id")){
+            return "[ERROR]: Cannot modify id column";
+        }
         Table table = database.getTable(tableName);
         if(table == null){
             return "[ERROR]: No such table: " + tableName;
@@ -450,6 +513,9 @@ public class DBServer {
         String type = tokens[1].toUpperCase();
         String name = tokens[2];
         if(type.equals("TABLE")) {
+            if(currentDatabase == null){
+                return "[ERROR]: No database selected";
+            }
             String tableFilePath = storageFolderPath + File.separator + currentDatabase
                     + File.separator + name.toLowerCase() + ".tab";
             File tableFile = new File(tableFilePath);
@@ -469,17 +535,16 @@ public class DBServer {
             }
             try{
                 deleteDirectory(dbDir);
-                if (name.equalsIgnoreCase(currentDatabase)) {
+                if (currentDatabase != null && name.equalsIgnoreCase(currentDatabase)) {
                     currentDatabase = null;
-                    return "[OK]";
                 }
+                return "[OK]";
             }catch(Exception e){
                 return "[ERROR]: Unable to delete database: " + name;
             }
         }else{
             return "[ERROR]: Invalid operation: " + type;
         }
-        return "[ERROR]: Invalid command format";
     }
 
     private void deleteDirectory(File dir)throws IOException{
@@ -496,6 +561,9 @@ public class DBServer {
     private String handleJoin(String command){
         command = command.replace(";","");
         String[] tokens = command.split("\\s+");
+        if(tokens.length < 8){
+            return "[ERROR]: Invalid JOIN command format";
+        }
         String table1Name = tokens[1];
         String table2Name = tokens[3];
         String column1 = tokens[5];
@@ -505,24 +573,38 @@ public class DBServer {
         if(table1 == null || table2 == null){
             return "[ERROR]: Invalid command format";
         }
+        if(!table1.getColumns().contains(column1) || !table2.getColumns().contains(column2)){
+            return "[ERROR]: Invalid attribute";
+        }
         StringBuilder result = new StringBuilder();
+        result.append("id").append("\t");
         for(String col : table1.getColumns()){
-            result.append(table1Name).append(".").append(col).append("\t");
+            if(!col.equalsIgnoreCase("id")){
+                result.append(table1Name).append(".").append(col).append("\t");
+            }
         }
         for(String col : table2.getColumns()){
-            result.append(table2Name).append(".").append(col).append("\t");
+            if(!col.equalsIgnoreCase("id")){
+                result.append(table2Name).append(".").append(col).append("\t");
+            }
         }
         result.append("\n");
+        int newId = 1;
         for(Row row1 : table1.getRows()){
             String value1 = row1.get(column1);
             for(Row row2 : table2.getRows()){
                 String value2 = row2.get(column2);
                 if(value1 != null && value1.equals(value2)){
+                    result.append(newId++).append("\t");
                     for(String col : table1.getColumns()){
-                        result.append(row1.get(col)).append("\t");
+                        if(!col.equalsIgnoreCase("id")){
+                            result.append(row1.get(col)).append("\t");
+                        }
                     }
                     for (String col : table2.getColumns()){
-                        result.append(row2.get(col)).append("\t");
+                        if(!col.equalsIgnoreCase("id")){
+                            result.append(row2.get(col)).append("\t");
+                        }
                     }
                     result.append("\n");
                 }
