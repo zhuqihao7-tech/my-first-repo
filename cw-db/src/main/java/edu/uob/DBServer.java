@@ -573,7 +573,9 @@ public class DBServer {
         if(table1 == null || table2 == null){
             return "[ERROR]: Invalid command format";
         }
-        if(!table1.getColumns().contains(column1) || !table2.getColumns().contains(column2)){
+        boolean col1Exists = table1.getColumns().stream().anyMatch(c -> c.equalsIgnoreCase(column1));
+        boolean col2Exists = table2.getColumns().stream().anyMatch(c -> c.equalsIgnoreCase(column2));
+        if (!col1Exists || !col2Exists) {
             return "[ERROR]: Invalid attribute";
         }
         StringBuilder result = new StringBuilder();
