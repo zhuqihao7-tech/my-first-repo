@@ -33,8 +33,6 @@ public class DBServer {
             System.out.println("Can't seem to create database storage folder " + storageFolderPath);
         }
 
-        database = new Database();
-
     }
 
     /**
@@ -123,15 +121,19 @@ public class DBServer {
     private final List<String> reservedKeywords = List.of(
             "USE","CREATE","DATABASE","TABLE","INSERT","INTO","VALUES",
             "SELECT","FROM","WHERE","UPDATE","SET","DELETE",
-            "ALTER","ADD","DROP","JOIN","AND","OR","LIKE","TRUE","FALSE"
+            "ALTER","ADD","DROP","JOIN","AND","OR","LIKE",
+            "TRUE","FALSE","NULL"
     );
 
     private boolean isReservedKeyword(String name) {
         return reservedKeywords.contains(name.toUpperCase());
     }
 
-    private void saveDatabase() {
+    private boolean isValidName(String name) {
+        return name.matches("[a-zA-Z0-9_]+") && !isReservedKeyword(name);
+    }
 
+    private void saveDatabase() {
         try {
 
             File dbDir = new File(storageFolderPath + File.separator + currentDatabase);
@@ -203,8 +205,8 @@ public class DBServer {
         }
         if(tokens[1].equalsIgnoreCase("TABLE")){
             String tableName = tokens[2];
-            if(isReservedKeyword(tableName)){
-                return "[ERROR]: Table name is reserved";
+            if(!isValidName(tableName)){
+                return "[ERROR]: Invalid table name";
             }
             if (currentDatabase == null) {
                 return "[ERROR]: No database selected";
@@ -249,6 +251,9 @@ public class DBServer {
         String[] parts = command.split("(?i)VALUES");
         String[] tokens = parts[0].trim().split("\\s+");
         String tableName = tokens[2];
+        if(!isValidName(tableName)){
+            return "[ERROR]: Invalid table name";
+        }
         String valuesPart = parts[1].trim();
         valuesPart = valuesPart.substring(1, valuesPart.length() - 1);
         String[] values = valuesPart.split(",");
@@ -280,6 +285,9 @@ public class DBServer {
         String[] tokens = command.split("\\s+");
         String selectPart = command.substring(7, command.toUpperCase().indexOf("FROM")).trim();
         String tableName = tokens[3];
+        if(!isValidName(tableName)){
+            return "[ERROR]: Invalid table name";
+        }
         Table table = database.getTable(tableName);
         if(table == null){
             return "[ERROR]: No such table: " + tableName;
@@ -291,7 +299,7 @@ public class DBServer {
             String[] cols = selectPart.split(",");
             for(String c : cols){
                 String colName = c.trim().toLowerCase();
-                if(!table.getColumns().contains(colName)){
+                if(!table.getColumns().contains(colName) || !isValidName(colName)){
                     return "[ERROR]: Invalid column name: " + colName;
                 }
                 selectedColumns.add(colName);
@@ -401,6 +409,9 @@ public class DBServer {
         String beforeSet = parts[0].trim();
         String afterSet = parts[1].trim();
         String tableName = beforeSet.split("\\s+")[1];
+        if (!isValidName(tableName)) {
+            return "[ERROR]: Invalid table name: " + tableName;
+        }
         String[] setWhere = afterSet.split("(?i)WHERE");
         String setPart = setWhere[0].trim();
         String condition = setWhere[1].trim();
@@ -414,7 +425,7 @@ public class DBServer {
         if(table == null){
             return "[ERROR]: No such table: " + tableName;
         }
-        if(!table.getColumns().contains(setColumn)){
+        if(!table.getColumns().contains(setColumn) || !isValidName(setColumn)){
             return "[ERROR]: Column does not exist: " + setColumn;
         }
         boolean updated = false;
@@ -442,6 +453,9 @@ public class DBServer {
             return "[ERROR]: Invalid command format";
         }
         String tableName = tokens[2];
+        if (!isValidName(tableName)) {
+            return "[ERROR]: Invalid table name: " + tableName;
+        }
         String condition = parts[1].trim();
         Table table = database.getTable(tableName);
         if(table == null){
@@ -469,10 +483,13 @@ public class DBServer {
             return "[ERROR]: Invalid command format";
         }
         String tableName = tokens[2];
+        if (!isValidName(tableName)) {
+            return "[ERROR]: Invalid table name: " + tableName;
+        }
         String operation = tokens[3].toUpperCase();
         String columnName = tokens[4].toLowerCase();
-        if (isReservedKeyword(columnName)){
-            return "[ERROR]: Reserved column name";
+        if (isValidName(columnName)){
+            return "[ERROR]: Invalid column name";
         }
         if(columnName.equalsIgnoreCase("id")){
             return "[ERROR]: Cannot modify id column";
@@ -535,7 +552,7 @@ public class DBServer {
             }
             try{
                 deleteDirectory(dbDir);
-                if (currentDatabase != null && name.equalsIgnoreCase(currentDatabase)) {
+                if (name.equalsIgnoreCase(currentDatabase)) {
                     currentDatabase = null;
                 }
                 return "[OK]";
@@ -564,14 +581,14 @@ public class DBServer {
         if(tokens.length < 8){
             return "[ERROR]: Invalid JOIN command format";
         }
-        String table1Name = tokens[1];
-        String table2Name = tokens[3];
-        String column1 = tokens[5];
-        String column2 = tokens[7];
+        String table1Name = tokens[1].toLowerCase();
+        String table2Name = tokens[3].toLowerCase();
+        String column1 = tokens[5].toLowerCase();
+        String column2 = tokens[7].toLowerCase();
         Table table1 = database.getTable(table1Name);
         Table table2 = database.getTable(table2Name);
         if(table1 == null || table2 == null){
-            return "[ERROR]: Invalid command format";
+            return "[ERROR]: Invalid command";
         }
         boolean col1Exists = table1.getColumns().stream().anyMatch(c -> c.equalsIgnoreCase(column1));
         boolean col2Exists = table2.getColumns().stream().anyMatch(c -> c.equalsIgnoreCase(column2));

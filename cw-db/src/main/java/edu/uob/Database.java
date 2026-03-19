@@ -19,12 +19,6 @@ public class Database {
     public Collection<Table> getTableValues(){
         return tables.values();
     }
-    public boolean hasTable(String name){
-        return tables.containsKey(name.toLowerCase());
-    }
-    public Map<String,Table> getAllTables(){
-        return tables;
-    }
 
     public void loadTable(String storageFolderPath, String databaseName, String tableName) throws IOException {
 

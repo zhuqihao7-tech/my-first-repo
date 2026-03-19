@@ -14,9 +14,6 @@ public class Row {
     public String get(String column) {
         return data.get(column.toLowerCase());
     }
-    public Map<String,String> getAllData(){
-        return data;
-    }
     public void remove(String column){
         data.remove(column.toLowerCase());
     }
